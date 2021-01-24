@@ -123,8 +123,10 @@
 #include <assert.h>
 #define count(X) (sizeof(X)/sizeof(X[0]))
 #ifndef M_PI
-# define M_PI 3.1415926535897932385
+#define M_PI 3.1415926535897932385
 #endif
+#define BUF_SIZE 512
+#define BUF_MIN 128
 
 /* Tag intentionally unused parameters with this macro to prevent
 ** compiler warnings with -Wextra */
@@ -5162,47 +5164,81 @@ int main(int argc, char **argv){
     int w, h;
 
     if( argv[i][0]=='-' ){
-      char *z = argv[i];
-      z++;
-      if( z[0]=='-' ) z++;
-      if( strcmp(z,"dont-stop")==0 ){
-        bDontStop = 1;
-      }else
-      if( strcmp(z,"dark-mode")==0 ){
-        zStyle = "color:white;background-color:black;";
-        mFlags |= PIKCHR_DARK_MODE;
-      }else
-      if( strcmp(z,"svg-only")==0 ){
-        if( zHtmlHdr==0 ){
-          fprintf(stderr, "the \"%s\" option must come first\n",argv[i]);
-          exit(1);
-        }
-        bSvgOnly = 1;
-        mFlags |= PIKCHR_PLAINTEXT_ERRORS;
-      }else
-      {
-        fprintf(stderr,"unknown option: \"%s\"\n", argv[i]);
-        usage(argv[0]);
+      if ( i==argc-1 && strlen(argv[i])==1 ){
+        // read from stdin
+				char *p;
+				int len, remain, n, size;
+
+				size = BUF_SIZE;
+				zIn = malloc(size);
+				len = 0;
+				remain = size;
+				while (!feof(stdin)) {
+					if (remain <= BUF_MIN) {
+						remain += size;
+						size *= 2;
+						p = realloc(zIn, size);
+						if (p == NULL) {
+							free(zIn);
+							break;
+						}
+						zIn = p;
+					}
+
+					fgets(zIn + len, remain, stdin);
+					n = strlen(zIn + len);
+					len += n;
+					remain -= n;
+				}
       }
-      continue;
+      else
+      {
+				char *z = argv[i];
+				z++;
+				if( z[0]=='-' ) z++;
+				if( strcmp(z,"dont-stop")==0 ){
+					bDontStop = 1;
+				}else
+				if( strcmp(z,"dark-mode")==0 ){
+					zStyle = "color:white;background-color:black;";
+					mFlags |= PIKCHR_DARK_MODE;
+				}else
+				if( strcmp(z,"svg-only")==0 ){
+					if( zHtmlHdr==0 ){
+						fprintf(stderr, "the \"%s\" option must come first\n",argv[i]);
+						exit(1);
+					}
+					bSvgOnly = 1;
+					mFlags |= PIKCHR_PLAINTEXT_ERRORS;
+				}else
+				{
+					fprintf(stderr,"unknown option: \"%s\"\n", argv[i]);
+					usage(argv[0]);
+				}
+				continue;
+      }
     }
-    in = fopen(argv[i], "rb");
-    if( in==0 ){
-      fprintf(stderr, "cannot open \"%s\" for reading\n", argv[i]);
-      continue;
+
+    if ( strcmp(argv[i],"-")!=0 ) {
+      // read from file
+			in = fopen(argv[i], "rb");
+			if( in==0 ){
+				fprintf(stderr, "cannot open \"%s\" for reading\n", argv[i]);
+				continue;
+			}
+			fseek(in, 0, SEEK_END);
+			sz = ftell(in);
+			rewind(in);
+			zIn = malloc( sz+1 );
+			if( zIn==0 ){
+				fprintf(stderr, "cannot allocate space for file \"%s\"\n", argv[i]);
+				fclose(in);
+				continue;
+			}
+			sz = fread(zIn, 1, sz, in);
+			fclose(in);
+			zIn[sz] = 0;
     }
-    fseek(in, 0, SEEK_END);
-    sz = ftell(in);
-    rewind(in);
-    zIn = malloc( sz+1 );
-    if( zIn==0 ){
-      fprintf(stderr, "cannot allocate space for file \"%s\"\n", argv[i]);
-      fclose(in);
-      continue;
-    }
-    sz = fread(zIn, 1, sz, in);
-    fclose(in);
-    zIn[sz] = 0;
     zOut = pikchr(zIn, "pikchr", mFlags, &w, &h);
     if( w<0 ) exitCode = 1;
     if( zOut==0 ){
