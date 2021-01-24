@@ -41,7 +41,11 @@ test:	pikchr
 	./pikchr */*.pikchr >out.html || true
 	open out.html || true
 	./pikchr --dark-mode */*.pikchr >darkmode.html || true
-	open darkmode.html
+	open darkmode.html || true
+	cat examples/headings01.pikchr | ./pikchr - >headings01-stdin.html || true
+	open headings01-stdin.html || true
+	echo 'C: box "box" radius 10px' | ./pikchr --svg-only - >box-stdin.svg || true
+	open box-stdin.svg || true
 
 clean:	
 	rm -f pikchr pikchr.c pikchr.h pikchr.out lemon out.html
